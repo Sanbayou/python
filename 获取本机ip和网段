@@ -1,0 +1,287 @@
+#!/usr/local/easyops/python/bin/python
+# -*- coding: utf-8 -*-
+import subprocess
+import sys
+import socket
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+class IP_check(object):
+    def make_ip(self, ip):
+        """
+        输入一个ip地址，将对应的ip地址转化为一个32位的二进制
+        """
+        ipbin = ''
+        ip_A = str(ip).split(".")
+        for i in ip_A:
+            A = bin(int(i))
+            ip_a = A[2:]  # 字符串除去前面的0b进行
+            # print(ip_a)
+            while len(str(ip_a)) < 8:
+                # 保证每一位都为8位
+                a = '0'
+                ip_a = a + ip_a
+            ipbin += ip_a
+        return ipbin
+
+    def make_mask(self, mask):
+        """
+        输入一个1-32的整数或者类似于255.255.255.0的掩码，返回一个32位的2进制序列
+        """
+        if len(mask) <= 2:
+            make_list = []
+            for i in range(32):
+                # 创建一个32全是0的空列表，输入的整数含有多少1，就在列表变为多少1
+                make_list.append(0)
+            for i in range(0, int(mask)):
+                make_list[i] = 1
+            make_list = str(make_list)
+            # print(make_list)
+            make_deal = (make_list.replace(", ", ""))[1:-1]
+        elif 32 >= len(mask) != 1:
+            make_deal = self.make_ip(mask)
+        return make_deal
+
+    def ip_check(self, ip, network):
+        """
+        输入一个ip，输入一个类似2.1.1.1/32的网络段，判断ip是否在这个网段内
+        """
+        make_network = network.split("/")
+        network_ip = int(self.make_ip(make_network[0]), 2)
+
+        network_mask = int(self.make_mask(make_network[1]), 2)
+        Ip = int(self.make_ip(ip), 2)
+        # 转为int数字，自动会将字符串前面的0去掉，导致保留位不到32，int(xx,2)表示一个字符串只存在0,1转化为10进制
+        if network_ip & network_mask == Ip & network_mask:
+            # print("YES")
+            return 'True'
+        else:
+            # print("NO")
+            return 'False'
+
+def get_ip():
+    s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    s.connect(('1.1.1.1',80))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
+
+
+def decide(ip, net_jyip):
+    res_list = []
+    ip_1 = IP_check()
+    for net in net_jyip:
+        result = ip_1.ip_check(ip, net)
+        res_list.append(result)
+        if result == 'True':
+            break
+    return res_list
+
+def install_agent(net):
+    print('install agent')
+    command = install_url.get(net)
+    print(command)
+    cmd_result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+    output_lines = str(cmd_result)
+    print(output_lines)
+    print('install success')
+    return output_lines
+
+def issuccess():
+    command = "tasklist /nh | find /i  \"easyAgent.exe\""
+    try:
+        cmd_result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+        output_lines = str(cmd_result)
+        #print(output_lines)
+        return 'True'
+    except subprocess.CalledProcessError as e:
+        print(e.returncode)
+        print(e.output)
+        return 'False'
+
+def main():
+    #ip = '192.168.64.158'
+    ip = get_ip()
+    print(' ip is {}'.format(ip))
+
+    if '192.168' in ip:
+        net_jy_ip = network.get('net_jy')
+        net_wg_ip = network.get('net_wg')
+        net_wl_ip = network.get('net_wl')
+        net_data_ip = network.get('net_data')
+        res_jy_list = decide(ip, net_jy_ip)
+        if 'True' not in res_jy_list:
+            print('not jy')
+            res_wg_list = decide(ip, net_wg_ip)
+            if 'True' not in res_wg_list:
+                print('not wg')
+                res_wl_list = decide(ip, net_wl_ip)
+                if 'True' not in res_wl_list:
+                    print(" not wl")
+                    res_data_list = decide(ip, net_data_ip)
+                    if 'True' not in res_data_list:
+                        print('not data, 192.168 find ip failed')
+                    else:
+                        print('network  is  net_data')
+                        install_agent(net='net_data')
+                else:
+                    print('network  is  net_wl')
+                    install_agent(net='net_wl')
+            else:
+                print('network  is net_wg')
+                install_agent(net='net_wg')
+        else:
+            print('network  is net_jy')
+            install_agent(net='net_jy')
+    else:
+        net_bg_ip = network.get('net_bg')
+        net_test_ip = network.get('net_test')
+        net_jydmz_ip = network.get('net_jydmz')
+        net_fjydmz_ip = network.get('net_fjydmz')
+        net_wg_ip = network.get('net_wg')
+        res_bg_list = decide(ip, net_bg_ip)
+        if 'True' not in res_bg_list:
+            print('not bg')
+            res_test_list = decide(ip, net_test_ip)
+            if 'True' not in res_test_list:
+                print('not test')
+                res_jydmz_list = decide(ip, net_jydmz_ip)
+                if 'True' not in res_jydmz_list:
+                    print('not jydmz')
+                    res_fjydmz_list = decide(ip, net_fjydmz_ip)
+                    if 'True' not in res_fjydmz_list:
+                        print('not fjydmz')
+                        res_wg_list = decide(ip, net_wg_ip)
+                        if 'True' not in res_wg_list:
+                            print('not wg')
+
+                        else:
+                            print('network  is net_wg')
+                            install_agent(net='net_wg')
+                    else:
+                        print('network  is net_fjydmz')
+                        install_agent(net='net_fjydmz')
+                else:
+                    print('network  is net_jydmz')
+                    install_agent(net='net_jydmz')
+            else:
+                print('network  is net_test')
+                install_agent(net='net_test')
+        else:
+            print('network  is net_bg')
+            install_agent(net='net_bg')
+
+if __name__ == "__main__":
+
+    network = {
+        'net_bg': [
+            '172.18.48.0/23',
+            '172.18.52.0/24',
+            '172.18.53.0/24',
+            '172.18.56.0/24',
+            '172.18.30.0/24',
+            '172.18.31.0/24',
+            '172.18.32.0/24',
+            '172.18.40.0/24',
+            '172.18.9.0/24',
+            '172.18.20.0/23',
+            '172.18.100.0/24',
+            '172.18.16.0/24',
+            '172.18.6.0/23',
+            '172.18.0.0/23',
+            '172.18.137.0/24',
+            '172.18.11.0/24',
+            '172.18.2.0/23',
+            '172.18.18.0/24',
+            '172.18.24.0/24',
+            '172.18.26.0/24',
+            '172.18.28.0/23',
+            '172.18.89.0/24',
+            '172.18.139.0/24',
+            '172.18.246.0/24',
+            '172.18.247.0/24',
+            '172.18.255.0/24',
+            '172.27.255.0/28',
+            '172.27.255.16/28',
+            '172.27.255.32/28',
+            '10.1.88.0/24',
+            '10.50.150.176/28',
+        ],
+        'net_jy': [
+            '192.168.2.0/24',
+            '192.168.1.0/24',
+            '192.168.11.0/24',
+            '192.168.4.0/24',
+            '192.168.16.0/23',
+            '192.168.16.0/24',
+            '192.168.17.0/24',
+            '192.168.30.0/24',
+            '192.168.32.0/24',
+            '192.168.33.0/24',
+            '192.168.139.0/24',
+            '192.168.192.128/27',
+            '192.168.250.0/24',
+            '192.168.250.0/28',
+            '192.168.254.0/24',
+        ],
+        'net_wg': [
+            '172.21.0.0/24',
+            '172.29.0.0/24',
+            '192.168.0.0/24',
+            '172.18.248.0/24',
+            '172.21.250.0/24',
+            '172.21.128.0/23',
+            '172.21.130.0/24',
+        ],
+        'net_test': [
+            '172.17.0.0/23',
+            '172.17.16.0/24',
+            '172.17.32.0/23',
+            '172.17.48.0/24',
+            '172.18.10.0/24',
+            '10.128.0.0/24',
+            '10.128.1.0/24',
+        ],
+        'net_jydmz': [
+            '172.30.1.0/24'
+        ],
+        'net_fjydmz': [
+            '172.30.0.0/24'
+        ],
+        'net_wl': [
+            '192.168.224.0/24',
+            '192.168.228.0/24',
+        ],
+        'net_data': [
+            '192.168.68.0/24',
+            '192.168.64.0/24',
+
+        ]
+    }
+
+    http_net_bg = "start C:\\software\\agent_install.exe -o 415818 -p 172.18.2.158,172.18.2.159"
+    http_net_jy = "start C:\\software\\agent_install.exe -o 415818 -p 192.168.11.158,192.168.11.159"
+    http_net_wg = "start C:\\software\\agent_install.exe -o 415818 -p 172.21.128.116,172.21.128.117"
+
+    http_net_test = "start C:\\software\\agent_install.exe -o 415818 -p 172.17.0.158,172.17.0.159"
+    http_net_jydmz = "start C:\\software\\agent_install.exe -o 415818 -p 172.30.1.135,172.30.1.136"
+    http_net_fjydmz = "start C:\\software\\agent_install.exe -o 415818 -p 172.30.0.158,172.30.0.159"
+    http_net_wl = "start C:\\software\\agent_install.exe -o 415818 -p 192.168.224.158,192.168.224.159"
+    http_net_data = "start C:\\software\\agent_install.exe -o 415818 -p 192.168.68.158,192.168.64.158"
+    install_url= {
+        'net_bg':http_net_bg,
+        'net_jy':http_net_jy,
+        'net_wg': http_net_wg,
+        'net_test':http_net_test,
+        'net_jydmz':http_net_jydmz,
+        'net_fjydmz':http_net_fjydmz,
+        'net_wl':http_net_wl,
+        'net_data':http_net_data,
+    }
+    isinstall = issuccess()
+    if isinstall == 'False':
+        print('start install')
+        main()
+    else:
+        print('Already installed')
+
